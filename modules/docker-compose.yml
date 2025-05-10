@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:v22.2.11
+    command: start-single-node --insecure
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+
+  nakama:
+    image: heroiclabs/nakama:latest
+    container_name: nakama
+    depends_on:
+      - cockroachdb
+    volumes:
+      - ./modules:/nakama/data/modules
+      - ./wait-for-it.sh:/wait-for-it.sh
+    entrypoint:
+    - /bin/sh
+    - -ecx
+    - |
+      chmod +x /wait-for-it.sh && \
+      /wait-for-it.sh cockroachdb 26257 && \
+      /nakama/nakama migrate up --database.address root@cockroachdb:26257 && \
+      exec /nakama/nakama \
+        --name nakama1 \
+        --database.address root@cockroachdb:26257 \
+        --runtime.path /nakama/data/modules \
+        --socket.ssl_certificate "" \
+        --socket.ssl_private_key ""
+
+    ports:
+      - "7350:7350"
+      - "7349:7349"
+
+volumes:
+  cockroach-data:
